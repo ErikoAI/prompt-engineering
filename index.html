@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Analysis Management Demo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100">
+    <!-- Header -->
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+      <!-- Variables Section -->
+      <div class="bg-yellow-100 p-4 rounded shadow-md mb-6">
+        <h2 class="text-lg font-semibold">Available Variables</h2>
+        <p class="text-gray-700 mb-2">
+          These are the available variables fetched from the API. Use them in
+          your prompt for better analysis.
+        </p>
+        <div
+          id="variableList"
+          class="text-sm bg-white p-3 border rounded"
+        >
+          Loading variables...
+        </div>
+      </div>
+
+      <div class="flex flex-col md:flex-row gap-8">
+        <!-- Left: List of Analyses -->
+        <div class="w-full md:w-1/3 bg-white p-4 rounded shadow-md">
+          <h2 class="text-xl font-semibold mb-4">Analysis List</h2>
+          <ul
+            id="analysisList"
+            class="space-y-2"
+          ></ul>
+          <button
+            id="addNewAnalysis"
+            class="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full"
+          >
+            + Add New Analysis
+          </button>
+        </div>
+
+        <!-- Right: Prompt Management -->
+        <div class="w-full md:w-2/3 bg-white p-6 rounded shadow-md">
+          <h2 class="text-xl font-semibold mb-4">Manage Prompt</h2>
+          <form
+            id="promptForm"
+            class="space-y-4"
+          >
+            <!-- Analysis Name -->
+            <div>
+              <label
+                for="analysisName"
+                class="block text-sm font-medium text-gray-700"
+                >Analysis Name</label
+              >
+              <input
+                type="text"
+                id="analysisName"
+                placeholder="Enter Analysis Name"
+                class="mt-1 p-2 w-full border rounded focus:ring focus:ring-blue-300"
+              />
+            </div>
+
+            <!-- Prompt -->
+            <div>
+              <label
+                for="prompt"
+                class="block text-sm font-medium text-gray-700"
+                >Prompt</label
+              >
+              <textarea
+                id="prompt"
+                rows="4"
+                placeholder="Enter Prompt Here"
+                class="mt-1 p-2 w-full border rounded focus:ring focus:ring-blue-300"
+              ></textarea>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex space-x-4">
+              <button
+                type="button"
+                id="savePrompt"
+                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              >
+                Save Prompt
+              </button>
+              <button
+                type="button"
+                id="runPrompt"
+                class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+              >
+                Run Prompt
+              </button>
+            </div>
+          </form>
+
+          <!-- Dummy Response Area -->
+          <div
+            id="responseArea"
+            class="mt-6 p-4 bg-gray-100 border rounded shadow-sm hidden"
+          >
+            <h3 class="text-lg font-semibold mb-2">Model Response</h3>
+            <p
+              id="dummyResponse"
+              class="text-gray-700"
+            ></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Query Section -->
+      <div class="mt-8 bg-white p-6 rounded shadow-md">
+        <h2 class="text-xl font-semibold mb-4">Generate Combined Response</h2>
+        <div id="queryChecklist" class="space-y-2">
+          <!-- Checklist of analyses will load here -->
+        </div>
+        <button
+          id="generateQuery"
+          class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Generate Combined Response
+        </button>
+
+        <!-- Combined Response -->
+        <div
+          id="combinedResponseArea"
+          class="mt-6 p-4 bg-gray-100 border rounded hidden"
+        >
+          <h3 class="text-lg font-semibold mb-2">Combined Response</h3>
+          <p
+            id="combinedResponse"
+            class="text-gray-700"
+          ></p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- JavaScript -->
+    <script>
+        const variables = [
+          "time_period: Month/Quarter/Year",
+          "region: Americas, EMEA, APAC",
+          "metric: Revenue, Churn Rate, User Growth",
+        ];
+      
+        const analyses = [
+          { id: 1, name: "Monthly Revenue Trend", prompt: "Summarize the revenue trend." },
+          { id: 2, name: "User Churn Analysis", prompt: "Analyze user churn." },
+        ];
+      
+        const variableList = document.getElementById("variableList");
+        const analysisList = document.getElementById("analysisList");
+        const queryChecklist = document.getElementById("queryChecklist");
+        const combinedResponse = document.getElementById("combinedResponse");
+        const combinedResponseArea = document.getElementById("combinedResponseArea");
+        const responseArea = document.getElementById("responseArea");
+        const dummyResponse = document.getElementById("dummyResponse");
+      
+        const analysisNameInput = document.getElementById("analysisName");
+        const promptInput = document.getElementById("prompt");
+      
+        let editingAnalysisId = null;
+      
+        // Load Variables
+        function loadVariables() {
+          variableList.innerHTML = variables.map((v) => `<p>${v}</p>`).join("");
+        }
+      
+        // Load Analyses List
+        function loadAnalyses() {
+          analysisList.innerHTML = "";
+          queryChecklist.innerHTML = "";
+          analyses.forEach((a) => {
+            // Analysis List
+            const li = document.createElement("li");
+            li.textContent = a.name;
+            li.className =
+              "bg-gray-200 p-3 rounded cursor-pointer hover:bg-blue-100";
+            li.onclick = () => loadPromptToEdit(a.id);
+            analysisList.appendChild(li);
+      
+            // Query Checklist
+            const checkbox = document.createElement("div");
+            checkbox.innerHTML = `
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" value="${a.id}" class="analysis-checkbox" />
+                <span>${a.name}</span>
+              </label>
+            `;
+            queryChecklist.appendChild(checkbox);
+          });
+        }
+      
+        // Load a Prompt to Edit
+        function loadPromptToEdit(id) {
+          const analysis = analyses.find((a) => a.id === id);
+          if (analysis) {
+            analysisNameInput.value = analysis.name;
+            promptInput.value = analysis.prompt;
+            editingAnalysisId = id;
+          }
+        }
+      
+        // Save Prompt
+        document.getElementById("savePrompt").onclick = () => {
+          const name = analysisNameInput.value.trim();
+          const prompt = promptInput.value.trim();
+      
+          if (!name || !prompt) {
+            alert("Please enter both Analysis Name and Prompt.");
+            return;
+          }
+      
+          if (editingAnalysisId) {
+            // Update existing analysis
+            const analysis = analyses.find((a) => a.id === editingAnalysisId);
+            if (analysis) {
+              analysis.name = name;
+              analysis.prompt = prompt;
+            }
+          } else {
+            // Add new analysis
+            analyses.push({
+              id: Date.now(),
+              name,
+              prompt,
+            });
+          }
+      
+          // Clear form and refresh
+          analysisNameInput.value = "";
+          promptInput.value = "";
+          editingAnalysisId = null;
+          loadAnalyses();
+          alert("Prompt saved successfully!");
+        };
+      
+        // Run Prompt
+        document.getElementById("runPrompt").onclick = () => {
+          const name = analysisNameInput.value.trim();
+          const prompt = promptInput.value.trim();
+      
+          if (!name || !prompt) {
+            alert("Please enter both Analysis Name and Prompt to run it.");
+            return;
+          }
+      
+          dummyResponse.textContent = `🔍 Running analysis "${name}":\n"${prompt}"\n\nResponse: This is a dummy response for "${name}".`;
+          responseArea.classList.remove("hidden");
+        };
+      
+        // Generate Combined Response
+        document.getElementById("generateQuery").onclick = () => {
+          const checkedBoxes = document.querySelectorAll(
+            ".analysis-checkbox:checked"
+          );
+          let response = "";
+          checkedBoxes.forEach((box) => {
+            const id = parseInt(box.value);
+            const analysis = analyses.find((a) => a.id === id);
+            response += `🚀 ${analysis.name}: Dummy response based on the prompt.\n`;
+          });
+          combinedResponse.textContent = response || "No analysis selected.";
+          combinedResponseArea.classList.remove("hidden");
+        };
+      
+        // Initialize
+        loadVariables();
+        loadAnalyses();
+      </script>
+      
+  </body>
+</html>
